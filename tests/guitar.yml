@@ -1,0 +1,17 @@
+---
+- name: Deploy a vm
+  hosts: localhost
+  connection: local
+  vars:
+    ansible_python_interpreter: "/usr/bin/env python"
+  tasks:
+    - k8s_crd:
+       crd: guitar
+       state: present
+       src: /tmp/stratocaster.yml
+#    - k8s_crd:
+#       name: telecaster
+#       crd: guitar
+#       state: present
+#       namespace: default
+#       domain: 
