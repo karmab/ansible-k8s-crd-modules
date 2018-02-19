@@ -23,22 +23,30 @@ EXAMPLES = '''
 - name: Create a guitar
   k8s_crd:
     name: strato
-    crd: guitar
+    kind: guitar
     namespace: default
     domain: kool.karmalabs.local
+
+- name: Create a guitar from a source file
+  k8s_crd:
+    name: strato
+    kind: guitar
+    namespace: default
+    src: /tmp/stratocaster.yml
 
 - name: Delete that guitar
   k8s_vm:
     name: strato
-    crd: guitar
+    kind: guitar
     namespace: default
     domain: kool.karmalabs.local
     state: absent
 '''
 
 
-def exists(crds, crd, version, domain, name, namespace):
-    allobjs = crds.list_cluster_custom_object(domain, version, '%ss' % crd)["items"]
+def exists(crds, kind, version, domain, name, namespace):
+    kind = kind.lower()
+    allobjs = crds.list_cluster_custom_object(domain, version, '%ss' % kind)["items"]
     objs = [o for o in allobjs if o.get("metadata")["namespace"] == namespace and o.get("metadata")["name"] == name]
     result = True if objs else False
     return result
@@ -55,7 +63,7 @@ def main():
         "domain": {"required": False, "type": "str"},
         "version": {"required": False, "type": "str"},
         "namespace": {"required": False, "type": "str"},
-        "crd": {"required": True, "type": "str"},
+        "kind": {"required": True, "type": "str"},
         "src": {"required": False, "type": "str"},
     }
     module = AnsibleModule(argument_spec=argument_spec)
@@ -66,7 +74,7 @@ def main():
     src = module.params['src']
     version = module.params['version']
     domain = module.params['domain']
-    crd = module.params['crd']
+    kind = module.params['kind']
     state = module.params['state']
     if src is not None:
         if not os.path.exists(src):
@@ -78,9 +86,10 @@ def main():
                 except yaml.scanner.ScannerError as err:
                     module.fail_json(msg='Error parsing src file, got %s' % err)
             name = obj.get("metadata")["name"]
+            kind = obj.get("kind").lower()
             namespace = obj.get("metadata")["namespace"]
             apiversion = obj.get("apiVersion")
-            version, domain = apiversion.split('/')
+            domain, version = apiversion.split('/')
     if name is None:
         module.fail_json(msg='missing name')
     if namespace is None:
@@ -89,7 +98,9 @@ def main():
         module.fail_json(msg='missing domain')
     if version is None:
         module.fail_json(msg='missing version')
-    found = exists(crds, crd, version, domain, name, namespace)
+    if kind is None:
+        module.fail_json(msg='missing kind')
+    found = exists(crds, kind, version, domain, name, namespace)
     if state == 'present':
         if found:
             changed = False
@@ -99,19 +110,19 @@ def main():
             changed = True
             skipped = False
             if src is None:
-                obj = {'kind': '%s' % crd.capitalize(), 'apiVersion': '%s/%s' % (domain, version), 'metadata': {'namespace': namespace, 'name': name}}
+                obj = {'kind': '%s' % kind.capitalize(), 'apiVersion': '%s/%s' % (domain, version), 'metadata': {'namespace': namespace, 'name': name}}
             try:
-                meta = crds.create_namespaced_custom_object(domain, version, namespace, '%ss' % crd, obj)
+                meta = crds.create_namespaced_custom_object(domain, version, namespace, '%ss' % kind, obj)
             except Exception as err:
                     module.fail_json(msg='Error creating object, got %s' % err)
     else:
         if found:
             try:
-                meta = crds.delete_namespaced_custom_object(domain, version, namespace, '%ss' % crd, name, client.V1DeleteOptions())
+                meta = crds.delete_namespaced_custom_object(domain, version, namespace, '%ss' % kind, name, client.V1DeleteOptions())
             except Exception as err:
                     module.fail_json(msg='Error deleting object, got %s' % err)
             changed = True
-    found = exists(crds, version, domain, name, namespace)
+    found = exists(crds, kind, version, domain, name, namespace)
     if state == 'present':
         if found:
             changed = False
@@ -121,13 +132,13 @@ def main():
             changed = True
             skipped = False
             try:
-                meta = crds.create_namespaced_custom_object(domain, version, namespace, '%ss' % crd, obj)
+                meta = crds.create_namespaced_custom_object(domain, version, namespace, '%ss' % kind, obj)
             except Exception as err:
                     module.fail_json(msg='Error creating object, got %s' % err)
     else:
         if found:
             try:
-                meta = crds.delete_namespaced_custom_object(domain, version, namespace, '%ss' % crd, name, client.V1DeleteOptions())
+                meta = crds.delete_namespaced_custom_object(domain, version, namespace, '%ss' % kind, name, client.V1DeleteOptions())
             except Exception as err:
                     module.fail_json(msg='Error deleting object, got %s' % err)
             changed = True

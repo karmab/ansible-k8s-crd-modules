@@ -6,12 +6,13 @@
     ansible_python_interpreter: "/usr/bin/env python"
   tasks:
     - k8s_crd:
-       crd: guitar
+       kind: guitar
        state: present
        src: /tmp/stratocaster.yml
-#    - k8s_crd:
-#       name: telecaster
-#       crd: guitar
-#       state: present
-#       namespace: default
-#       domain: 
+    - k8s_crd:
+       name: telecaster
+       kind: guitar
+       state: present
+       namespace: default
+       domain: kool.karmalabs.local
+       version: v1
